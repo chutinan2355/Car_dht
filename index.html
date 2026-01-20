@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<title>RC Car Cloud Dashboard</title>
+
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+
+<style>
+body{
+  background:#020617;
+  color:#e5e7eb;
+  font-family:sans-serif;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  height:100vh;
+}
+.box{
+  background:#020b1c;
+  padding:30px;
+  border-radius:20px;
+  box-shadow:0 0 30px rgba(56,189,248,.4);
+  text-align:center;
+}
+button{
+  width:100px;
+  height:45px;
+  margin:6px;
+  border-radius:12px;
+  border:none;
+  background:#0ea5e9;
+  color:white;
+  font-size:18px;
+}
+.status{
+  margin-top:15px;
+}
+</style>
+</head>
+
+<body>
+<div class="box">
+  <h2>🚗 RC Car (Cloud)</h2>
+
+  <div>
+    <button onclick="send('UP')">▲</button><br>
+    <button onclick="send('LEFT')">◀</button>
+    <button onclick="send('STOP')">■</button>
+    <button onclick="send('RIGHT')">▶</button><br>
+    <button onclick="send('DOWN')">▼</button>
+  </div>
+
+  <div style="margin-top:10px">
+    <button onclick="buzzerOn()">🔊 ON</button>
+    <button onclick="buzzerOff()">🔇 OFF</button>
+  </div>
+
+  <div class="status">
+    🌡 Temp: <span id="temp">--</span> °C <br>
+    💧 Hum: <span id="hum">--</span> %
+  </div>
+</div>
+
+<script>
+const options = {
+  protocol: 'wss',
+  username: 'Car_dht',
+  password: 'Car12345678',
+};
+
+const client = mqtt.connect(
+  'wss://d8f1e354609d43788f15a0768c5ca293.s1.eu.hivemq.cloud:8884/mqtt',
+  options
+);
+
+client.on('connect', () => {
+  console.log('Connected to HiveMQ Cloud');
+  client.subscribe('rccar/dht');
+});
+
+client.on('message', (topic, message) => {
+  if(topic === 'rccar/dht'){
+    const data = JSON.parse(message.toString());
+    document.getElementById('temp').innerText = data.temp;
+    document.getElementById('hum').innerText = data.hum;
+  }
+});
+
+function send(cmd){
+  client.publish('rccar/control', cmd);
+}
+
+function buzzerOn(){
+  client.publish('rccar/buzzer', 'ON');
+}
+
+function buzzerOff(){
+  client.publish('rccar/buzzer', 'OFF');
+}
+</script>
+</body>
+</html>
