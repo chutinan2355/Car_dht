@@ -2,101 +2,183 @@
 <html lang="th">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RC Car Cloud Dashboard</title>
 
 <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
 <style>
+*{box-sizing:border-box;font-family:'Segoe UI',sans-serif}
 body{
-  background:#020617;
-  color:#e5e7eb;
-  font-family:sans-serif;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  height:100vh;
+  margin:0;height:100vh;
+  background:radial-gradient(circle at top,#0f2027,#000);
+  display:flex;justify-content:center;align-items:center;color:#fff
 }
-.box{
-  background:#020b1c;
-  padding:30px;
-  border-radius:20px;
-  box-shadow:0 0 30px rgba(56,189,248,.4);
-  text-align:center;
+.dashboard{
+  width:950px;height:450px;
+  background:#050b12;border-radius:24px;
+  box-shadow:0 0 40px rgba(0,180,255,.4);
+  display:grid;grid-template-columns:1fr 1fr 1fr;
+  grid-template-rows:auto 1fr;padding:24px;gap:24px
 }
-button{
-  width:100px;
-  height:45px;
-  margin:6px;
-  border-radius:12px;
-  border:none;
-  background:#0ea5e9;
-  color:white;
-  font-size:18px;
+.panel{
+  background:linear-gradient(180deg,#08131f,#02070d);
+  border-radius:50px;
+  display:flex;justify-content:center;align-items:center;
+  flex-direction:column
 }
-.status{
-  margin-top:15px;
+.panel h2{
+  color:#7dd3fc;
+  text-shadow:0 0 10px rgba(125,211,252,.8)
+}
+.control-btn{
+  width:120px;height:50px;margin:10px;
+  border-radius:40px;border:none;
+  font-size:20px;color:#fff;
+  background:linear-gradient(180deg,#0ea5e9,#0369a1);
+  box-shadow:0 0 15px rgba(14,165,233,.8);
+  cursor:pointer;transition:.12s
+}
+.control-btn:active{
+  transform:scale(.94) translateY(3px);
+  box-shadow:0 0 30px rgba(56,189,248,1)
+}
+.turn-row{display:flex}
+
+.temp-gauge,.humid-gauge{
+  width:160px;height:160px;border-radius:50%;
+  display:flex;justify-content:center;align-items:center
+}
+.temp-gauge{
+  background:conic-gradient(var(--tcolor) 0deg,
+    var(--tcolor2) calc(var(--temp)*1.8deg),#0b1220 0deg);
+  box-shadow:0 0 35px var(--glow);
+  transition:.5s
+}
+.humid-gauge{
+  background:conic-gradient(#02fc27 0deg,
+    #20e202 calc(var(--humid)*3.6deg),#0b1220 0deg);
+  box-shadow:0 0 30px rgba(34,197,94,.9)
+}
+.temp-inner{
+  width:120px;height:120px;border-radius:50%;
+  background:#050b12;
+  display:flex;flex-direction:column;
+  justify-content:center;align-items:center
+}
+.temp-value{
+  font-size:36px;
+  text-shadow:0 0 12px currentColor
+}
+.top-row{
+  grid-column:1/4;
+  display:flex;justify-content:center
 }
 </style>
 </head>
 
 <body>
-<div class="box">
-  <h2>🚗 RC Car (Cloud)</h2>
+<div class="dashboard">
 
-  <div>
-    <button onclick="send('UP')">▲</button><br>
-    <button onclick="send('LEFT')">◀</button>
-    <button onclick="send('STOP')">■</button>
-    <button onclick="send('RIGHT')">▶</button><br>
-    <button onclick="send('DOWN')">▼</button>
+  <div class="top-row">
+    <button class="control-btn" onclick="toggleBuzzer()">🔊</button>
   </div>
 
-  <div style="margin-top:10px">
-    <button onclick="buzzerOn()">🔊 ON</button>
-    <button onclick="buzzerOff()">🔇 OFF</button>
+  <div class="panel">
+    <h2>D / R</h2>
+    <button class="control-btn" onclick="send('UP')">▲</button>
+    <button class="control-btn" onclick="send('DOWN')">▼</button>
   </div>
 
-  <div class="status">
-    🌡 Temp: <span id="temp">--</span> °C <br>
-    💧 Hum: <span id="hum">--</span> %
+  <div class="panel">
+    <h2>STATUS</h2>
+    <div style="display:flex;gap:30px">
+      <div class="temp-gauge" id="tempGauge"
+        style="--temp:0;--tcolor:#38bdf8;--tcolor2:#22d3ee;--glow:#38bdf8">
+        <div class="temp-inner">
+          <div class="temp-value" id="temp">0</div>°C
+        </div>
+      </div>
+
+      <div class="humid-gauge" id="humidGauge" style="--humid:0">
+        <div class="temp-inner">
+          <div class="temp-value" id="humid">0</div>%
+        </div>
+      </div>
+    </div>
   </div>
+
+  <div class="panel">
+    <h2>L / R</h2>
+    <div class="turn-row">
+      <button class="control-btn" onclick="send('LEFT')">◀</button>
+      <button class="control-btn" onclick="send('RIGHT')">▶</button>
+    </div>
+    <button class="control-btn" onclick="send('STOP')">■</button>
+  </div>
+
 </div>
 
 <script>
-const options = {
-  protocol: 'wss',
-  username: 'Car_dht',
-  password: 'Car12345678',
-};
-
+// ================= MQTT =================
 const client = mqtt.connect(
   'wss://d8f1e354609d43788f15a0768c5ca293.s1.eu.hivemq.cloud:8884/mqtt',
-  options
+  {
+    protocol: 'wss',
+    username: 'Car_dht',
+    password: 'Car12345678',
+  }
 );
 
 client.on('connect', () => {
-  console.log('Connected to HiveMQ Cloud');
+  console.log('Connected');
   client.subscribe('rccar/dht');
 });
 
-client.on('message', (topic, message) => {
+client.on('message', (topic, msg) => {
   if(topic === 'rccar/dht'){
-    const data = JSON.parse(message.toString());
-    document.getElementById('temp').innerText = data.temp;
-    document.getElementById('hum').innerText = data.hum;
+    const d = JSON.parse(msg.toString());
+    temp.innerText = d.temp;
+    humid.innerText = d.hum;
+    tempGauge.style.setProperty("--temp", d.temp);
+    humidGauge.style.setProperty("--humid", d.hum);
+    setTempColor(d.temp);
   }
 });
 
+// ================= Control =================
 function send(cmd){
   client.publish('rccar/control', cmd);
 }
 
-function buzzerOn(){
-  client.publish('rccar/buzzer', 'ON');
+function toggleBuzzer(){
+  client.publish('rccar/buzzer','TOGGLE');
 }
 
-function buzzerOff(){
-  client.publish('rccar/buzzer', 'OFF');
+// ================= Temp Color =================
+function setTempColor(t){
+  let g=tempGauge,v=temp;
+  if(t<20){
+    g.style.setProperty("--tcolor","#38bdf8");
+    g.style.setProperty("--tcolor2","#22d3ee");
+    g.style.setProperty("--glow","rgba(56,189,248,1)");
+    v.style.color="#38bdf8";
+  }else if(t<30){
+    g.style.setProperty("--tcolor","#22c55e");
+    g.style.setProperty("--tcolor2","#4ade80");
+    g.style.setProperty("--glow","rgba(34,197,94,1)");
+    v.style.color="#22c55e";
+  }else if(t<40){
+    g.style.setProperty("--tcolor","#fb923c");
+    g.style.setProperty("--tcolor2","#fdba74");
+    g.style.setProperty("--glow","rgba(251,146,60,1)");
+    v.style.color="#fb923c";
+  }else{
+    g.style.setProperty("--tcolor","#ef4444");
+    g.style.setProperty("--tcolor2","#f87171");
+    g.style.setProperty("--glow","rgba(239,68,68,1)");
+    v.style.color="#ef4444";
+  }
 }
 </script>
 </body>
