@@ -1,359 +1,233 @@
-    <!DOCTYPE html>
-    <html lang="th">
-    <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RC Car Controller</title>
-    <script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RC Car Controller</title>
 
-    <style>
-        * { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
-        body {
-        margin: 0;
-        height: 100vh;
-        background: radial-gradient(circle at top, #0f2027, #000);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        color: #fff;
-        }
+<script src="https://unpkg.com/mqtt/dist/mqtt.min.js"></script>
 
-        .dashboard {
-        width: 950px;
-        height: 450px;
-        background: #050b12;
-        border-radius: 24px;
-        box-shadow: 0 0 40px rgba(0, 180, 255, 0.3);
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
-        grid-template-rows: auto 1fr; /* ← เพิ่มแถวบน */
-        padding: 24px;
-        gap: 24px;
-        }
+<style>
+* { box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+body {
+  margin: 0;
+  height: 100vh;
+  background: radial-gradient(circle at top, #0f2027, #000);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  color: #fff;
+}
+.dashboard {
+  width: 950px;
+  height: 450px;
+  background: #050b12;
+  border-radius: 24px;
+  box-shadow: 0 0 40px rgba(0,180,255,.3);
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: auto 1fr;
+  padding: 24px;
+  gap: 24px;
+}
+.panel {
+  background: linear-gradient(180deg,#08131f,#02070d);
+  border-radius: 50px;
+  box-shadow: inset 0 0 20px rgba(0,150,255,.2);
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.panel h2 {
+  color: #7dd3fc;
+  margin-bottom: 12px;
+}
+.control-btn {
+  width: 120px;
+  height: 50px;
+  margin: 10px;
+  border-radius: 40px;
+  border: none;
+  font-size: 20px;
+  color: #fff;
+  background: linear-gradient(180deg,#0ea5e9,#0369a1);
+  box-shadow: 0 0 15px rgba(14,165,233,.8);
+  cursor: pointer;
+}
+.control-btn:active {
+  transform: scale(.95);
+}
+.turn-row { display: flex; }
 
+.temp-gauge,.humid-gauge {
+  width: 160px;
+  height: 160px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.temp-gauge {
+  background: conic-gradient(
+    #22d3ee 0deg,
+    #38bdf8 calc(var(--temp) * 1.8deg),
+    #0b1220 0deg
+  );
+}
+.humid-gauge {
+  background: conic-gradient(
+    #02fc27 0deg,
+    #20e202 calc(var(--humid) * 3.6deg),
+    #0b1220 0deg
+  );
+}
+.temp-inner {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: #050b12;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+.temp-value {
+  font-size: 36px;
+  font-weight: bold;
+}
 
-        .panel {
-        background: linear-gradient(180deg, #08131f, #02070d);
-        border-radius: 50px;
-        box-shadow: inset 0 0 20px rgba(0, 150, 255, 0.2);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-direction: column;
-        }
+.switch {
+  position: relative;
+  width: 60px;
+  height: 26px;
+}
+.switch input { display:none; }
+.slider {
+  position:absolute; inset:0;
+  background:#1e293b;
+  border-radius:30px;
+  cursor:pointer;
+}
+.slider::before {
+  content:"";
+  position:absolute;
+  height:22px; width:22px;
+  left:2px; top:2px;
+  background:#ef4444;
+  border-radius:50%;
+  transition:.3s;
+}
+input:checked + .slider {
+  background:#22c55e;
+}
+input:checked + .slider::before {
+  transform: translateX(34px);
+  background:#22c55e;
+}
+.switch-label {
+  margin-top:6px;
+  font-size:14px;
+  text-align:center;
+}
+.top-row {
+  grid-column: 1/4;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  gap:30px;
+}
+.horn-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border:none;
+  background:#f59e0b;
+  font-size:18px;
+  cursor:pointer;
+}
+.horn-btn:active { transform: scale(.9); }
+.control-btn,.horn-btn { touch-action:none; }
+</style>
+</head>
 
-        .panel h2 {
-        margin-bottom: 12px;
-        font-size: 18px;
-        color: #7dd3fc;
-        letter-spacing: 1px;
-        }
+<body>
+<div class="dashboard">
 
-        .control-btn {
-        width: 120px;
-        height: 50px;
-        margin: 10px;
-        border-radius: 40px;
-        border: none;
-        font-size: 20px;
-        color: #fff;
-        background: linear-gradient(180deg, #0ea5e9, #0369a1);
-        box-shadow: 0 0 15px rgba(14,165,233,0.8);
-        cursor: pointer;
-        transition: 0.15s;
-        }
-
-        .control-btn:active {
-        transform: scale(0.95);
-        box-shadow: 0 0 30px rgba(14,165,233,1);
-        }
-
-        .turn-row {
-        display: flex;
-        gap: 0px;
-        }
-        .temp-gauge {
-        width: 160px;
-        height: 160px;
-        border-radius: 50%;
-        background:
-            conic-gradient(
-            #22d3ee 0deg,
-            #38bdf8 calc(var(--temp) * 1.8deg),
-            #0b1220 0deg
-            );
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        box-shadow: inset 0 0 25px rgba(0, 200, 255, 0.894);
-        }
-
-        .humid-gauge {
-        width: 160px;
-        height: 160px;
-        border-radius: 50%;
-        background:
-          conic-gradient(
-            #02fc27e1 0deg,
-            #20e202 calc(var(--humid) * 3.6deg),
-            #0b1220 0deg
-          );
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        box-shadow: inset 0 0 25px rgba(0, 255, 47, 0.723);
-        }
-
-
-        .temp-inner {
-        width: 120px;
-        height: 120px;
-        border-radius: 50%;
-        background: #050b12;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        }
-
-        .temp-value {
-        font-size: 40px;
-        font-weight: bold;
-        color: #7dd3fc;
-        }
-
-        .temp-unit {
-        font-size: 16px;
-        color: #7dd3fc;
-        }
-        
-
-        .switch {
-        position: relative;
-        width: 70px;   /* เดิม 120px */
-        height: 3px;  /* เดิม 48px */
-        }
-
-        .switch-label {
-        width: 30px;          /* เท่ากับ .switch */
-        text-align: center;
-        margin-top: 6px;
-        font-size: 14px;
-        letter-spacing: 1px;
-        }
-
-
-        .switch input {
-        opacity: 0;
-        width: 0;
-        height: 0;
-        }
-
-        .slider {
-        position: absolute;
-        inset: 0;
-        background: #1e293b;
-        border-radius: 30px;
-        cursor: pointer;
-        box-shadow: inset 0 0 10px rgba(0,0,0,0.6);
-        transition: 0.3s;
-        }
-
-        .slider::before {
-        content: "";
-        position: absolute;
-        height: 23px;
-        width: 25px;
-        left: 0;
-        top: 0;
-        background: radial-gradient(circle, #f50606, #ec1616);
-        border-radius: 50%;
-        box-shadow:
-          0 0 12px rgba(231, 27, 27, 0.9),
-          inset 0 0 6px rgba(234, 46, 46, 0.6);
-        transition: 0.3s;
-        }
-
-
-
-        input:checked + .slider {
-        background: linear-gradient(90deg, #12d459, #02c91c);
-        box-shadow: 0 0 20px rgba(11, 211, 38, 0.8);
-      }
-
-      input:checked + .slider::before {
-        background: radial-gradient(circle, #1cfc04, #03ea58);
-        box-shadow:
-          0 0 18px rgba(34,197,94,1),
-          inset 0 0 6px rgba(255,255,255,0.8);
-        transform: translateX(10px);
-      }
-
-
-        #lightText {
-        transition: 0.3s;
-      }
-
-      input:checked ~ #lightText {
-        color: #22c55e;
-        text-shadow: 0 0 10px rgba(34,197,94,0.8);
-      }
-
-      /* กล่องควบคุมด้านบน */
-      .top-control {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-      }
-
-      /* แถวเดียวกัน: LED + HORN */
-      .top-row {
-        display: flex;
-        align-items: center;
-        gap: 18px;
-      }
-
-      /* ปุ่มแตร */
-      .horn-btn {
-        width: 40px;
-        height: 39px;
-        border-radius: 50%;
-        border: none;
-        background: radial-gradient(circle, #fde047, #f59e0b);
-        box-shadow:
-          0 0 15px rgba(245,158,11,0.9),
-          inset 0 0 6px rgba(255,255,255,0.7);
-        cursor: pointer;
-        font-size: 18px;
-      }
-
-      .horn-btn:active {
-        transform: scale(0.9);
-        box-shadow: 0 0 25px rgba(245,158,11,1);
-      }
-
-      .horn-shift {
-        margin-left: 40px;
-        margin-top: -7px; /* ปรับเลขตรงนี้ */
-      }
-      .control-btn, .horn-btn {
-        touch-action: none;
-        }
-
-
-    </style>
-    </head>
-    <body>
-
-    <div class="dashboard">
-
-      <!-- LIGHT CONTROL (TOP, OUTSIDE PANELS) -->
-      <div style="
-      grid-column: 1 / 4;
-      display: flex;
-      justify-content: center;
-    ">
-      <div class="top-row">
-
-        <div style="text-align:center;">
-          <label class="switch">
-            <input type="checkbox" id="lightSwitch" onchange="toggleLight(this)">
-            <span class="slider"></span>
-          </label>
-          <div class="switch-label" id="lightText">LED:OFF</div>
-        </div>
-
-        <button class="horn-btn horn-shift"
-        onpointerdown="hornOn()"
-        onpointerup="hornOff()"
-        onpointerleave="hornOff()">🔊</button>
-
-
-      </div>
+  <!-- TOP CONTROL -->
+  <div class="top-row">
+    <div style="text-align:center">
+      <label class="switch">
+        <input type="checkbox" id="lightSwitch" onchange="toggleLight(this)">
+        <span class="slider"></span>
+      </label>
+      <div class="switch-label" id="lightText">LED:OFF</div>
     </div>
 
+    <button class="horn-btn"
+      onpointerdown="hornOn()"
+      onpointerup="hornOff()"
+      onpointerleave="hornOff()">🔊</button>
+  </div>
 
+  <!-- LEFT -->
+  <div class="panel">
+    <h2>D / R</h2>
+    <button class="control-btn"
+      onpointerdown="sendCmd('forward')"
+      onpointerup="sendCmd('stop')"
+      onpointerleave="sendCmd('stop')">▲</button>
 
-        <!-- LEFT: FORWARD / BACKWARD -->
-        <div class="panel">
-        <h2>D/R</h2>
-        <button class="control-btn"
-        onpointerdown="sendCmd('forward')"
+    <button class="control-btn"
+      onpointerdown="sendCmd('backward')"
+      onpointerup="sendCmd('stop')"
+      onpointerleave="sendCmd('stop')">▼</button>
+  </div>
+
+  <!-- CENTER -->
+  <div class="panel">
+    <h2>STATUS</h2>
+    <div style="display:flex;gap:30px">
+      <div class="temp-gauge" id="tempGauge" style="--temp:0">
+        <div class="temp-inner">
+          <div class="temp-value" id="temp">0</div>°C
+        </div>
+      </div>
+      <div class="humid-gauge" id="humidGauge" style="--humid:0">
+        <div class="temp-inner">
+          <div class="temp-value" id="humid">0</div>%
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="panel">
+    <h2>L / R</h2>
+    <div class="turn-row">
+      <button class="control-btn"
+        onpointerdown="sendCmd('left')"
         onpointerup="sendCmd('stop')"
-        onpointerleave="sendCmd('stop')">▲</button>
+        onpointerleave="sendCmd('stop')">◀</button>
 
-
-        <button class="control-btn"
-        onpointerdown="sendCmd('backward')"
+      <button class="control-btn"
+        onpointerdown="sendCmd('right')"
         onpointerup="sendCmd('stop')"
-        onpointerleave="sendCmd('stop')">▼</button>
+        onpointerleave="sendCmd('stop')">▶</button>
+    </div>
+  </div>
 
+</div>
 
-        </div>
-        
-        <!-- CENTER: STATUS -->
-        <div class="panel center">
-          <h2 style="margin-top:40px;">STATUS</h2>
-
-          
-
-          <!-- เกจ -->
-          <div style="display:flex; gap:30px; margin-top:20px;">
-            <!-- อุณหภูมิ -->
-            <div style="text-align:center; color:#7dd3fc;">
-              <div style="font-weight: 650;">TEM</div>
-              <div class="temp-gauge" id="tempGauge" style="--temp:0">
-                <div class="temp-inner">
-                  <div class="temp-value" id="temp">0</div>
-                  <div class="temp-unit">°C</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- ความชื้น -->
-            <div style="text-align:center; color:#7dd3fc;">
-              <div style="font-weight: 650;">HUM</div>
-              <div class="humid-gauge" id="humidGauge" style="--humid:0">
-                <div class="temp-inner">
-                  <div class="temp-value" id="humid">0</div>
-                  <div class="temp-unit">%</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-                <!-- RIGHT: TURN LEFT / RIGHT -->
-                <div class="panel">
-          <h2>L/R</h2>
-          <div class="turn-row">
-            <button class="control-btn"
-            onpointerdown="sendCmd('left')"
-            onpointerup="sendCmd('stop')"
-            onpointerleave="sendCmd('stop')">◀</button>
-
-
-            <button class="control-btn"
-            onpointerdown="sendCmd('right')"
-            onpointerup="sendCmd('stop')"
-            onpointerleave="sendCmd('stop')">▶</button>
-
-
-          </div>
-        </div>
-
-
-    <script>
-  const options = {
-  connectTimeout: 4000,
-  protocol: 'wss',
-    username: 'Car_dht',
-    password: 'Car12345678',
-};
-
+<script>
+/* ================= MQTT ================= */
 const mqttClient = mqtt.connect(
   'wss://cfef36079d904715930b9ca5bc77c84a.s1.eu.hivemq.cloud:8884/mqtt',
-  options
+  {
+    protocol: 'wss',
+    username: 'Car_dht',
+    password: 'Car12345678'
+  }
 );
 
 mqttClient.on('connect', () => {
@@ -362,37 +236,40 @@ mqttClient.on('connect', () => {
   mqttClient.subscribe('car/humid');
 });
 
-/* ================= RECEIVE SENSOR ================= */
-mqttClient.on('message', (topic, message) => {
-  const value = Number(message.toString());
-
-  if (topic === 'car/temp') {
-    const t = Math.min(Math.max(value, 0), 100);
-    document.getElementById('temp').innerText = t;
-    document.getElementById('tempGauge')
-      .style.setProperty('--temp', t);
+function safePublish(topic,msg){
+  if(mqttClient.connected){
+    mqttClient.publish(topic,String(msg));
   }
+}
 
-  if (topic === 'car/humid') {
-    const h = Math.min(Math.max(value, 0), 100);
-    document.getElementById('humid').innerText = h;
-    document.getElementById('humidGauge')
-      .style.setProperty('--humid', h);
+/* ================= RECEIVE ================= */
+mqttClient.on('message',(topic,message)=>{
+  const v = Number(message.toString());
+  if(topic==='car/temp'){
+    temp.innerText=v;
+    tempGauge.style.setProperty('--temp',v);
+  }
+  if(topic==='car/humid'){
+    humid.innerText=v;
+    humidGauge.style.setProperty('--humid',v);
   }
 });
 
 /* ================= CONTROL ================= */
-function sendCmd(cmd) {
-  if (mqttClient && mqttClient.connected) {
-    mqttClient.publish('car/cmd', cmd);
-  } else {
-    console.warn('⚠️ MQTT not connected, cmd ignored:', cmd);
-  }
+function sendCmd(cmd){
+  safePublish('car/cmd',cmd);
 }
-function sendCmd(cmd) {
-  safePublish('car/cmd', cmd);
+function toggleLight(el){
+  const s = el.checked?'on':'off';
+  lightText.innerText = el.checked?'LED:ON':'LED:OFF';
+  safePublish('car/light',s);
 }
-
-function toggleLight(el) {
-  const state = el.checked ? 'on' : 'off';
-  document.getElem
+function hornOn(){
+  safePublish('car/horn','on');
+}
+function hornOff(){
+  safePublish('car/horn','off');
+}
+</script>
+</body>
+</html>
